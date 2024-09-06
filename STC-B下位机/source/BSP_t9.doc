@@ -1,0 +1,93 @@
+#include "STC15F2K60S2.H"        //±ØÐë¡£
+#include "sys.H"                 //±ØÐë¡£
+#include "displayer.H"
+#include "key.H"
+#include "beep.H"
+#include "Vib.h"
+#include "hall.H"
+#include "adc.h"
+#include "music.h"
+
+
+code unsigned long SysClock=11059200;         //?????????????(Hz),??????????????(??????)??
+#ifdef _displayer_H_                          //??????????(????????,?????????) 
+code char decode_table[]={0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f,0x40, 
+	                       0x3f|0x80,0x06|0x80,0x5b|0x80,0x4f|0x80,0x66|0x80,0x6d|0x80,0x7d|0x80,
+                         0x07|0x80,0x7f|0x80,0x6f|0x80,0x40|0x80 };  
+#endif
+
+
+char ledValue=0x00;
+unsigned int currmSecond=0,currSecond=0,currMinute=0;
+int a[8];
+int is_stop=1;
+void myKey_callback()
+{ char k;
+	SetBeep(1000,10);
+	k=GetKeyAct(enumKey1);
+	if( k == enumKeyPress )    {
+		    is_stop=!is_stop;
+        ledValue = !ledValue;
+    }else if( k == enumKeyRelease ){
+	      LedPrint(ledValue);
+		}
+}
+
+void my1mS_callback()
+{  
+	if(!is_stop){
+    ++currmSecond;
+    if (currmSecond == 1000)
+    {
+        ++currSecond;
+        currmSecond = 0;
+        if (currSecond == 60)
+        {
+            ++currMinute;
+            currSecond = 0;
+            if (currMinute == 100){
+							  ledValue=0xff;
+                is_stop = 1;
+						}
+        }
+    }
+	}
+  a[0]=currMinute / 10;
+	a[1]=currMinute % 10+11;
+	a[2]=currSecond / 10;
+	a[3]=currSecond % 10;
+  a[4]=10;
+	a[5]=currmSecond/100;
+	a[6]=(currmSecond%100) / 10;
+	a[7]=currmSecond % 10;
+  Seg7Print(a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7]);	
+	LedPrint(ledValue);
+}
+void my10mS_callback()
+{ 
+  a[0]=currMinute / 10;
+	a[1]=currMinute % 10+11;
+	a[2]=currSecond / 10;
+	a[3]=currSecond % 10;
+  a[4]=10;
+	a[5]=currmSecond/100;
+	a[6]=(currmSecond%100) / 10;
+	a[7]=currmSecond % 10;
+  Seg7Print(a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7]);	
+	LedPrint(ledValue);
+}
+void main() 
+{ DisplayerInit();  
+	KeyInit();
+	AdcInit();  
+	BeepInit();
+	SetDisplayerArea(0,7);
+  Seg7Print(currMinute / 10,currMinute % 10+11,currSecond / 10,currSecond % 10,10,currmSecond/100,(currmSecond%100) / 10,currmSecond % 10);	
+	SetEventCallBack(enumEventSys1mS, my1mS_callback);
+	SetEventCallBack(enumEventSys10mS, my10mS_callback);
+  SetEventCallBack(enumEventKey, myKey_callback);	
+  MySTC_Init();	    
+	while(1)             	
+		{ MySTC_OS();    
+		}	             
+}  

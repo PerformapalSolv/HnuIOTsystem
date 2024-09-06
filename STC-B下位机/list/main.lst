@@ -1,0 +1,144 @@
+C51 COMPILER V9.56.0.0   MAIN                                                              09/03/2024 09:37:38 PAGE 1   
+
+
+C51 COMPILER V9.56.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\output\main.obj
+COMPILER INVOKED BY: D:\Keil_Arm_V5\C51\BIN\C51.EXE source\main.c OPTIMIZE(8,SPEED) BROWSE INCDIR(.\inc) DEBUG OBJECTEXT
+                    -END PRINT(.\list\main.lst) TABS(2) OBJECT(.\output\main.obj)
+
+line level    source
+
+   1          #include "STC15F2K60S2.H"
+   2          #include "sys.H"
+   3          #include "displayer.H"
+   4          #include "beep.h"
+   5          #include "adc.h"
+   6          #include "hall.h"
+   7          #include "vib.h"
+   8          #include "key.h"
+   9          #include "uart1.h"
+  10          code unsigned long SysClock=11059200;
+  11           
+  12          #ifdef _displayer_H_ 
+  13          code char decode_table[]={0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f,0x00,0x08,0x40,0x01,0x76,0x38}
+             -;   
+  14                         /* ??:   0    1    2    3    4    5    6    7    8    9    10     11  12   13   14   15  */
+  15                           /* ??:   0    1    2    3    4    5    6    7    8    9    (?)   ?-  ?-  ?-   H    L  */ 
+  16           
+  17          
+  18          unsigned char pos[4];
+  19          unsigned char mat[2]={0xaa,0x55};
+  20          unsigned char msg[6]={0xa5};
+  21          unsigned char key1[1]={0x01};
+  22          unsigned int light_intensity;
+  23          unsigned int light_sum;
+  24          char gewei;
+  25          char shiwei;
+  26          char baiwei;
+  27          
+  28          unsigned char key3[2]={0x03,0x33};
+  29          unsigned char keyup[1]={0x04};
+  30          unsigned char keydown[1]={0x05};
+  31          unsigned char keycenter[1]={0x06};
+  32          void myHall_callback()
+  33          { 
+  34   1        if( GetHallAct() == enumHallGetClose) 
+  35   1          { 
+  36   2            SetBeep(1000,20);
+  37   2            msg[4]=0x01;
+  38   2          }else{
+  39   2            msg[4]=0x00;
+  40   2          }
+  41   1        
+  42   1      }
+  43          
+  44          void myVib_callback()
+  45          { 
+  46   1        if(GetVibAct()==enumVibQuake){
+  47   2          msg[5]=0x01;
+  48   2        }
+  49   1      }
+  50          /*void myKN_callback(){
+  51              if(GetAdcNavAct(enumAdcNavKeyUp)== enumKeyPress||GetAdcNavAct(enumAdcNavKeyLeft)  == enumKeyPress)
+  52                Uart1Print(&keyup,1);
+  53            if(GetAdcNavAct(enumAdcNavKeyDown)== enumKeyPress||GetAdcNavAct(enumAdcNavKeyRight) == enumKeyPress)
+C51 COMPILER V9.56.0.0   MAIN                                                              09/03/2024 09:37:38 PAGE 2   
+
+  54                Uart1Print(&keydown,1);
+  55            if(GetAdcNavAct(enumAdcNavKeyCenter)== enumKeyPress)    
+  56            {
+  57              Uart1Print(&keycenter,1);
+  58            }
+  59            if(GetAdcNavAct(enumAdcNavKey3) == enumKeyPress){
+  60               Uart1Print(&key3,2);
+  61            }
+  62          }*/
+  63          void myKN_callback(){
+  64   1        SetBeep(1000,10);
+  65   1        if(GetAdcNavAct(enumAdcNavKeyCenter)== enumKeyPress)    
+  66   1        {
+  67   2          msg[5]=0x00;
+  68   2        }
+  69   1      }
+  70          void Per100ms_displayer(){
+  71   1        light_sum+=GetADC().Rop;
+  72   1        gewei = (GetADC().Rop % 10);
+  73   1        shiwei = (GetADC().Rop/ 10) % 10;
+  74   1        baiwei = (GetADC().Rop / 100) % 10;
+  75   1        if(GetADC().Rop>100){
+  76   2          Seg7Print(msg[5],10,10,10,10,baiwei,shiwei,gewei);
+  77   2        }
+  78   1        else{
+  79   2          Seg7Print(msg[5],10,10,10,10,10,shiwei,gewei);
+  80   2        }
+  81   1        if(msg[5])SetBeep(1000,50);
+  82   1      }
+  83          
+  84          void do_1S(){
+  85   1        light_intensity=light_sum/10;
+  86   1        light_sum=0;
+  87   1        msg[1]=(light_intensity/ 100) % 10;
+  88   1        msg[2]=(light_intensity / 10) % 10;
+  89   1        msg[3]=light_intensity % 10;
+  90   1        Uart1Print(&msg,6);
+  91   1      }
+  92          int main(){
+  93   1        DisplayerInit(); 
+  94   1        SetDisplayerArea(0,7);
+  95   1        Seg7Print(msg[5],10,10,10,10,10,10,10);
+  96   1        LedPrint(0);
+  97   1        BeepInit();
+  98   1        AdcInit(ADCexpEXT);
+  99   1        HallInit();
+ 100   1        VibInit();
+ 101   1        Uart1Init(1200); 
+ 102   1        SetUart1Rxd(pos,4,mat, 2);
+ 103   1        
+ 104   1        
+ 105   1        SetEventCallBack(enumEventNav, myKN_callback);
+ 106   1        SetEventCallBack(enumEventSys100mS, Per100ms_displayer);
+ 107   1        SetEventCallBack(enumEventSys1S, do_1S);
+ 108   1        SetEventCallBack(enumEventHall, myHall_callback);
+ 109   1        SetEventCallBack(enumEventVib , myVib_callback);
+ 110   1        MySTC_Init();
+ 111   1        while(1){
+ 112   2           MySTC_OS();
+ 113   2        }   
+ 114   1      }
+*** WARNING C316 IN LINE 114 OF source\main.c: unterminated conditionals
+C51 COMPILER V9.56.0.0   MAIN                                                              09/03/2024 09:37:38 PAGE 3   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    480    ----
+   CONSTANT SIZE    =     20    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     25    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)
